@@ -1,0 +1,82 @@
+勒索病毒应急处置流程
+1.事件状态判断
+	了解现状，了解发病时间，了解系统架构
+	确认被感染主机范围
+2.临时处置
+	已感染主机：进行网络隔离，禁止使用U盘、移动银盘等移动存储设备
+	未感染主机：ACL隔离、关闭ssh、rdp等协议，禁止使用U盘、移动硬盘。
+3.信息收集分析
+	样本获取
+		windows：
+			文件排查：
+				msconfig查看启动项
+				%UserProfile%\Recent查看最近使用的的文档
+			进程排查
+				netstat -ano查看网络连接、定位可疑的ESTABLISHED
+				tasklist | findstr 1228 根据netstat定位出的pid,在通过tasklist进行进程定位
+				wmic process | findstr "vmvare-hostd.exe" 获取进程全路径
+			系统信息排查
+				查看环境变量设置
+				windows计划任务（程序-附件-系统工具-任务计划程序）
+				windows账号信息，如隐藏账号等（compmgmt.msc）用户名以$结尾的为隐藏用户
+				查看当前系统用户的会话query user,logoff踢出该用户
+				查看systeminfo信息，系统版本以及补丁信息
+				工具排查
+					PC Hunter 信息信息查看
+					ProcessExplorer 系统和应用程序监视够工具
+					Network Monitor 网络协议分析
+			日志排查（计算机管理-事件查看器 eventvwr）
+				日志类型：
+					应用程序日志（应用程序日常使用记录）
+					系统安全日志（谁，使用什么权限、干了什么事）
+					setup：软件安装、更新安装
+					系统日志：组策略更改等系统敏感操作
+					forwarded-Events：暂无日志信息
+				主要分析安全日志，借助自带的筛选和查找功能，将帅选日志导出使用notepad++打开
+				使用正则去匹配远程登录过的IP地址
+				((?:(?:25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d))).){3}(?:25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))) 
+				
+		linux
+			文件排查
+				使用stat命令：
+					access time访问时间
+					modify time内容修改时间（黑客通过菜刀类工具改变的是修改时间，所以如果修改时间在创建时间之前明显是可以文件）
+					change time属性改变时间
+				1.敏感目录文件分析[类/tmp目录、命令目录/usr/bin、/usr/sbin]
+				ls -a 查看隐藏文件和目录
+				2.查看tmp目录下的文件  ls -alt /tmp [-t 按更改时间排序]
+				3.查看看机启动项  ls -alt /etc/init.d ,/etc/init.d是/etc/rc.d/init.d的软链接
+				4.按时间排序查看指定目录下的文件  ls -alt | head -n 10
+				5.查看历史命令记录文件  cat /root/.bash_history | more
+				6.查看操作系统用户信息文件/etc/passwd
+				root:x:0:0:root:/root:/bin/bash 
+				[用户名:口令:用户标识:组标识:注释性描述:主目录:登录shell]
+				7.查找新增文件 
+				 查找24小时内被修改的php文件find ./ -mtime 0 -name "*.php"
+				 查找72小时内新增的文件  find / -ctime 2
+				 -mtime -n +n 按更改时间查找  -n n天以内  +n n天以前
+				 -atime -n +n 按访问时间查找  -n n天以内  +n n天以前
+				 -ctime -n +n 按创建时间查找  -n n天以内  +n n天以前 
+				8.特殊权限文件查看
+				 查找777权限的文件  find / *.php -perm 4777
+				9.隐藏的文件  ls -ar | grep "^\."
+				10.查看分析任务计划  crontab -u <-l、-r、-e>
+				-u 指定用户 -l 列出某用户任务计划 -r 删除任务 
+				-e 编辑某个用户的任务（也可以直接修改/etc/crontab文件）
+			进程排查
+				1.使用netstat -anptl/-pantu | more 查看网络连接状况
+				2.根据netstat 定位出的可疑pid，使用ps命令、分析进程
+				ps aux | grep pid | grep -v grep 
+			日志排查
+				1.查看系统用户登录信息
+				 lastlog，查看系统中所有用户最近一次登录的信息
+				 lastb，显示用户错误的登录列表
+				 last，显示用户最近登录信息。
+4.事件处置
+	已感染主机：进行断网隔离、等待解密进展、重装系统
+	未感染主机：
+		补丁修复（在线补丁、离线补丁）
+		事件加固：安装防护软件（开启实时防护、及时更新病毒库）
+5.事件防御
+	预防：定期打补丁、口令策略加固
+	监控：部署杀毒软件、部署流量监测设备
